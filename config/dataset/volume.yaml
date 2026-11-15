@@ -1,0 +1,20 @@
+defaults:
+  - view_sampler: even
+
+name: volume
+# each root holds train/ and test/, with one <scene>/gaussian_splat/{transforms.json, render_config.json, images/}
+# per scene
+roots: [datasets/volume]
+augment: true
+
+image_shape: [256, 256]
+background_color: [0.0, 0.0, 0.0]
+cameras_are_circular: false
+
+# the volume center is moved to the origin and the volume's bounding ball is scaled to radius k
+k: 1.0
+# tight: near / far are the bounding ball's depth range, k * (r / rho -+ 1), per scene
+# fixed: near / far below
+bounds: tight
+near: -1.
+far: -1.

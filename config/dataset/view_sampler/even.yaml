@@ -1,0 +1,7 @@
+name: even
+
+num_context_views: 6
+num_target_views: 4
+
+# seeds the k-means regions only; which view is taken from each region is random
+seed: 42
