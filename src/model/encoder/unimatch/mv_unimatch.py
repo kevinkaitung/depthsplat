@@ -32,6 +32,7 @@ class MultiViewUniMatch(nn.Module):
         unet_num_res_blocks=1,
         unet_attn_resolutions=[4],
         grid_sample_disable_cudnn=False,
+        vit_pretrained=True,
         **kwargs,
     ):
         super(MultiViewUniMatch, self).__init__()
@@ -78,8 +79,10 @@ class MultiViewUniMatch(nn.Module):
 
         # monodepth
         encoder = vit_type  # can also be 'vitb' or 'vitl'
+        # vit_pretrained=False builds the ViT with random weights (no DINOv2 initialization)
         self.pretrained = torch.hub.load(
-            "facebookresearch/dinov2", "dinov2_{:}14".format(encoder)
+            "facebookresearch/dinov2", "dinov2_{:}14".format(encoder),
+            pretrained=vit_pretrained,
         )
 
         del self.pretrained.mask_token  # unused

@@ -32,6 +32,8 @@ local_mv_match: 2
 
 # monodepth
 monodepth_vit_type: vits
+# false: random ViT weights instead of DINOv2's
+monodepth_vit_pretrained: true
 
 # return depth
 supervise_intermediate_depth: true

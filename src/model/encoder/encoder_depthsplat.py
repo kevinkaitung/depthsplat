@@ -68,6 +68,9 @@ class EncoderDepthSplatCfg:
     # multi-view matching
     local_mv_match: int
 
+    # False: the monodepth ViT starts from random weights instead of DINOv2's (training from scratch)
+    monodepth_vit_pretrained: bool = True
+
 
 class EncoderDepthSplat(Encoder[EncoderDepthSplatCfg]):
     def __init__(self, cfg: EncoderDepthSplatCfg) -> None:
@@ -80,6 +83,7 @@ class EncoderDepthSplat(Encoder[EncoderDepthSplatCfg]):
             vit_type=cfg.monodepth_vit_type,
             unet_channels=cfg.depth_unet_channels,
             grid_sample_disable_cudnn=cfg.grid_sample_disable_cudnn,
+            vit_pretrained=cfg.monodepth_vit_pretrained,
         )
 
         if self.cfg.train_depth_only:
