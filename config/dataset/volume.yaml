@@ -18,3 +18,9 @@ k: 1.0
 bounds: tight
 near: -1.
 far: -1.
+
+# 0: each root holds train/ and test/ (validation draws from test/)
+# > 0: each root holds the scenes directly; after a shuffle seeded with holdout_seed, this many scenes are held
+# out of training and used for validation (the test stage still reads <root>/test)
+val_holdout: 0
+holdout_seed: 42

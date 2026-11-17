@@ -6,6 +6,10 @@ distance r, and the renderer placed it at r = safety_margin * rho / tan(fov_y / 
 half-diagonal (safety_margin and fov_y are in render_config.json). So the volume lies inside the ball
 (center, rho).
 
+With val_holdout > 0, each root instead holds the scenes directly (<root>/<scene>/gaussian_splat/...), as
+TokenGS's and InSituNet's training folders do: the scenes of all roots are shuffled with holdout_seed, the first
+val_holdout go to validation and the rest to training. The test stage still reads <root>/test.
+
 Normalization: the volume center is moved to the origin and positions are scaled by k / rho, so every volume
 fits a ball of radius k whatever its world units. With bounds "tight", near / far are that ball's depth range from
 any camera, k (r / rho -+ 1); with "fixed" they are cfg.near / cfg.far.
@@ -16,6 +20,7 @@ feeds the same scenes to this model at evaluation time.
 
 import json
 import math
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -45,6 +50,29 @@ class DatasetVolumeCfg(DatasetCfgCommon):
     bounds: Literal["tight", "fixed"]
     near: float  # used when bounds is "fixed"
     far: float
+    # 0: roots hold train/ and test/. > 0: roots hold the scenes directly, and this many are held out of
+    # training for validation (see the module docstring)
+    val_holdout: int = 0
+    holdout_seed: int = 42
+
+
+def list_scenes(directory: Path) -> list[Path]:
+    """<directory>/<scene>/gaussian_splat for every scene with a transforms.json, sorted."""
+    if not directory.is_dir():
+        raise FileNotFoundError(f"{directory} does not exist")
+    return sorted(
+        path / SCENE_SUBDIR for path in directory.iterdir() if (path / SCENE_SUBDIR / "transforms.json").is_file()
+    )
+
+
+def holdout_split(scenes: list[Path], n_val: int, seed: int) -> tuple[list[Path], list[Path]]:
+    """(train, val) scenes: a seeded shuffle puts n_val scenes in val; both lists keep the sorted order."""
+    if n_val >= len(scenes):
+        raise ValueError(f"val_holdout = {n_val} leaves no training scenes ({len(scenes)} scenes found)")
+    shuffled = sorted(scenes)
+    random.Random(seed).shuffle(shuffled)
+    val = set(shuffled[:n_val])
+    return [s for s in sorted(scenes) if s not in val], [s for s in sorted(scenes) if s in val]
 
 
 def scene_geometry(transforms: dict, render_cfg: dict, radius_tol: float = 1e-3) -> dict:
@@ -112,24 +140,18 @@ class DatasetVolume(Dataset):
         self.to_tensor = tf.ToTensor()
         self._cameras: dict[int, dict] = {}  # per-process cache; a scene's cameras never change
 
-        self.scenes = []
-        for root in cfg.roots:
-            stage_dir = root / self.data_stage
-            if not stage_dir.is_dir():
-                raise FileNotFoundError(f"{stage_dir} does not exist (stage {stage})")
-            self.scenes.extend(
-                sorted(
-                    path / SCENE_SUBDIR
-                    for path in stage_dir.iterdir()
-                    if (path / SCENE_SUBDIR / "transforms.json").is_file()
-                )
-            )
+        # roots hold the scenes directly when held-out validation is on, except for the test stage
+        flat = cfg.val_holdout > 0 and stage != "test"
+        scene_dirs = [root if flat else root / self.data_stage for root in cfg.roots]
+        self.scenes = [scene for directory in scene_dirs for scene in list_scenes(directory)]
         if cfg.overfit_to_scene is not None:
             self.scenes = [s for s in self.scenes if s.parent.name == cfg.overfit_to_scene]
+        elif flat:
+            train, val = holdout_split(self.scenes, cfg.val_holdout, cfg.holdout_seed)
+            self.scenes = train if stage == "train" else val
         if not self.scenes:
             raise FileNotFoundError(
-                f"no scenes with {SCENE_SUBDIR}/transforms.json under "
-                f"{[str(root / self.data_stage) for root in cfg.roots]}"
+                f"no scenes with {SCENE_SUBDIR}/transforms.json under {[str(d) for d in scene_dirs]}"
             )
 
     @property
