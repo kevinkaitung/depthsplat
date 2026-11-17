@@ -8,7 +8,7 @@ half-diagonal (safety_margin and fov_y are in render_config.json). So the volume
 
 With val_holdout > 0, each root instead holds the scenes directly (<root>/<scene>/gaussian_splat/...), as
 TokenGS's and InSituNet's training folders do: the scenes of all roots are shuffled with holdout_seed, the first
-val_holdout go to validation and the rest to training. The test stage still reads <root>/test.
+val_holdout go to validation (and to the test stage) and the rest to training.
 
 Normalization: the volume center is moved to the origin and positions are scaled by k / rho, so every volume
 fits a ball of radius k whatever its world units. With bounds "tight", near / far are that ball's depth range from
@@ -140,8 +140,8 @@ class DatasetVolume(Dataset):
         self.to_tensor = tf.ToTensor()
         self._cameras: dict[int, dict] = {}  # per-process cache; a scene's cameras never change
 
-        # roots hold the scenes directly when held-out validation is on, except for the test stage
-        flat = cfg.val_holdout > 0 and stage != "test"
+        # roots hold the scenes directly when held-out validation is on; the test stage then gets the held-out scenes
+        flat = cfg.val_holdout > 0
         scene_dirs = [root if flat else root / self.data_stage for root in cfg.roots]
         self.scenes = [scene for directory in scene_dirs for scene in list_scenes(directory)]
         if cfg.overfit_to_scene is not None:
